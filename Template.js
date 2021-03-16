@@ -1,107 +1,60 @@
 #!/usr/bin/gjs
 
-/*
-GJS example showing how to build Gtk javascript applications
-using Webkit.WebView, also showing how to send messages from GTK
-to Webkit and vice versa
+imports.gi.versions.Gtk = '3.0';
+imports.gi.versions.WebKit2 = '4.0';
 
-Run it with:
-    gjs egWebmsg.js
-*/
-
-const Gio   = imports.gi.Gio;
-const GLib  = imports.gi.GLib;
-const Gtk   = imports.gi.Gtk;
-const Lang  = imports.lang;
+const GLib = imports.gi.GLib;
+const Gtk = imports.gi.Gtk;
 const Webkit = imports.gi.WebKit2;
 
-// Get application folder and add it into the imports path
-function getAppFileInfo() {
-    let stack = (new Error()).stack,
-        stackLine = stack.split('\n')[1],
-        coincidence, path, file;
+class HelloGNOME {
 
-    if (!stackLine) throw new Error('Could not find current file (1)');
+    // Create the application itself
+    constructor() {
+        this.application = new Gtk.Application ();
 
-    coincidence = new RegExp('@(.+):\\d+').exec(stackLine);
-    if (!coincidence) throw new Error('Could not find current file (2)');
-
-    path = coincidence[1];
-    file = Gio.File.new_for_path(path);
-    return [file.get_path(), file.get_parent().get_path(), file.get_basename()];
-}
-const path = getAppFileInfo()[1];
-imports.searchPath.push(path);
-
-const App = function () { 
-
-    this.title = 'Paint';
-    GLib.set_prgname(this.title);
-};
-
-App.prototype.run = function (ARGV) {
-
-    this.application = new Gtk.Application();
-    this.application.connect('activate', () => { this.onActivate(); });
-    this.application.connect('startup', () => { this.onStartup(); });
-    this.application.run([]);
-};
-
-App.prototype.onActivate = function () {
-
-    this.window.show_all();
-};
-
-App.prototype.onStartup = function() {
-
-    this.buildUI();
-};
-
-App.prototype.buildUI = function() {
-
-    this.window = new Gtk.ApplicationWindow({ application: this.application,
-                                              title: this.title,
-                                              default_height: 1000,
-                                              default_width: 1000,
-                                              window_position: Gtk.WindowPosition.CENTER });
-    try {
-        this.window.set_icon_from_file(path + '/assets/appIcon.png');
-    } catch (err) {
-        this.window.set_icon_name('application-x-executable');
+        // Connect 'activate' and 'startup' signals to the callback functions
+        this.application.connect('activate', this._onActivate.bind(this));
+        this.application.connect('startup', this._onStartup.bind(this));
     }
 
-    this.window.add(this.getBody());
+    // Callback function for 'activate' signal presents windows when active
+    _onActivate() {
+        this._window.present();
+    }
+
+    // Callback function for 'startup' signal builds the UI
+    _onStartup() {
+        this._buildUI();
+    }
+
+    // Build the application's UI
+    _buildUI() {
+
+        // Create the application window
+        this._window = new Gtk.ApplicationWindow  ({
+            application: this.application,
+            title: "Welcome to GNOME",
+            default_height: 200,
+            default_width: 400,
+            window_position: Gtk.WindowPosition.CENTER });
+
+        // Create a webview to show the web app
+        this._webView = new Webkit.WebView ();
+
+        // Put the web app into the webview
+        this._webView.load_uri (GLib.filename_to_uri (GLib.get_current_dir() +
+            "/index.html", null));
+
+        // Put the webview into the window
+        this._window.add (this._webView);
+
+        // Show the window and all child widgets
+        this._window.show_all();
+    }
+
 };
 
-App.prototype.getBody = function() {
-
-    let webView, button, label, grid;
-
-    webView = new Webkit.WebView({ vexpand: true });
-    webView.load_uri(GLib.filename_to_uri (path + '', null));
-    webView.connect('notify::title', (self, params) => {
-        // Get Webkit messages into GTK listening to 'notify::title' signals
-        label.label = webView.title;
-    });
-
-    button = new Gtk.Button({ label: '' });
-    button.connect('clicked', () => {
-            // Execute one Webkit function to send a message from GTK to Webkit
-            webView.run_javascript('messageFromGTK("Message from GTK!");', null, (self, result, error) => {
-                self.run_javascript_finish(result);
-            });
-        });
-
-    label = new Gtk.Label({ label: '' });
-
-    grid = new Gtk.Grid({ column_homogeneous: true });
-    grid.attach (webView, 0, 0, 2, 1);
-    grid.attach (button, 0, 1, 1, 1);
-    grid.attach (label, 1, 1, 1, 1);
-
-    return grid;
-}; 
-
-//Run the application
-let app = new App();
-app.run(ARGV);
+// Run the application
+let app = new HelloGNOME ();
+app.application.run (ARGV);
